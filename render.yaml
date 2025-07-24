@@ -1,18 +1,20 @@
-# PostgreSQL databases go in the databases section
 databases:
   - name: ciso-db
     plan: free
-    ipAllowList: [] # Allows internal connections only
+    postgres:
+      version: 14
+    ipAllowList: []  # Only allow internal connections
 
 services:
-  # Django Backend Service
+  # Backend Service
   - type: web
     name: backend
     runtime: docker
+    repo: https://github.com/compliance-rehab/ciso-assistant-community.git
+    branch: main           # Change if you use a different branch for your backend
+    rootDir: backend       # Adjust if your Dockerfile is not in /backend
     plan: free
-    region: oregon # Specify region to match database
-    image:
-      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest
+    region: oregon
     healthCheckPath: /api/build
     envVars:
       - key: DATABASE_URL
@@ -22,14 +24,15 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
 
-  # Huey Background Worker
+  # Huey worker (background tasks)
   - type: worker
     name: huey
     runtime: docker
+    repo: https://github.com/compliance-rehab/ciso-assistant-community.git
+    branch: main          # Change if you use a different branch
+    rootDir: backend      # Adjust if necessary
     plan: free
-    region: oregon # Same region as database
-    image:
-      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest
+    region: oregon
     dockerCommand: "poetry run python manage.py run_huey -w 2"
     envVars:
       - key: DATABASE_URL
@@ -41,14 +44,13 @@ services:
   - type: web
     name: frontend
     runtime: docker
+    repo: https://github.com/compliance-rehab/ciso-assistant-community.git
+    branch: main           # Change if using a different branch
+    rootDir: frontend      # Adjust if your Dockerfile is not in /frontend
     plan: free
-    region: oregon # Same region as other services
-    image:
-      url: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://backend-[your-hash].onrender.com/api/*
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    region: oregon
+    envVars:
+      # If your frontend expects a backend API, expose the Render backend service URL here.
+      # Replace the value with your service's real Render URL after initial deployment:
+      - key: PUBLIC_BACKEND_API_URL
+        value: "https://backend-RENDERHASH.onrender.com/api"
