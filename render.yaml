@@ -1,56 +1,54 @@
-services:
-  # 1. A FREE managed PostgreSQL Database
-  - type: pserv
-    name: ciso-db
+# PostgreSQL databases go in the databases section
+databases:
+  - name: ciso-db
     plan: free
-    postgres:
-      version: 14
+    ipAllowList: [] # Allows internal connections only
 
-  # 2. The Django Backend Service
+services:
+  # Django Backend Service
   - type: web
     name: backend
+    runtime: docker
     plan: free
-    env: docker
+    region: oregon # Specify region to match database
     image:
-      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest # Use the pre-built image
+      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest
     healthCheckPath: /api/build
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
+        fromDatabase:
           name: ciso-db
           property: connectionString
       - key: DJANGO_DEBUG
-        value: False
+        value: "False"
 
-  # 3. The Huey Background Worker
+  # Huey Background Worker
   - type: worker
     name: huey
+    runtime: docker
     plan: free
-    env: docker
+    region: oregon # Same region as database
     image:
-      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest # Use the same backend image
-    dockerCommand: "poetry run python manage.py run_huey -w 2" # Specify the command for the worker
+      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest
+    dockerCommand: "poetry run python manage.py run_huey -w 2"
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
+        fromDatabase:
           name: ciso-db
           property: connectionString
 
-  # 4. The Frontend Service (acts as the main entry point)
+  # Frontend Service
   - type: web
     name: frontend
+    runtime: docker
     plan: free
-    env: docker
+    region: oregon # Same region as other services
     image:
-      url: ghcr.io/intuitem/ciso-assistant-community/frontend:latest # Use the pre-built image
-    # This section replaces Caddy's routing functionality
-    rewrites:
-      - source: /api/:path* # Route API calls to the backend
-        destination: /api/:path*
-        service:
-          type: web
-          name: backend
-      - source: /* # Route all other calls to the frontend
+      url: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://backend-[your-hash].onrender.com/api/*
+      - type: rewrite
+        source: /*
         destination: /index.html
