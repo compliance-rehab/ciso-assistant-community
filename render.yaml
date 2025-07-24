@@ -1,0 +1,56 @@
+services:
+  # 1. A FREE managed PostgreSQL Database
+  - type: pserv
+    name: ciso-db
+    plan: free
+    postgres:
+      version: 14
+
+  # 2. The Django Backend Service
+  - type: web
+    name: backend
+    plan: free
+    env: docker
+    image:
+      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest # Use the pre-built image
+    healthCheckPath: /api/build
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: ciso-db
+          property: connectionString
+      - key: DJANGO_DEBUG
+        value: False
+
+  # 3. The Huey Background Worker
+  - type: worker
+    name: huey
+    plan: free
+    env: docker
+    image:
+      url: ghcr.io/intuitem/ciso-assistant-community/backend:latest # Use the same backend image
+    dockerCommand: "poetry run python manage.py run_huey -w 2" # Specify the command for the worker
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: ciso-db
+          property: connectionString
+
+  # 4. The Frontend Service (acts as the main entry point)
+  - type: web
+    name: frontend
+    plan: free
+    env: docker
+    image:
+      url: ghcr.io/intuitem/ciso-assistant-community/frontend:latest # Use the pre-built image
+    # This section replaces Caddy's routing functionality
+    rewrites:
+      - source: /api/:path* # Route API calls to the backend
+        destination: /api/:path*
+        service:
+          type: web
+          name: backend
+      - source: /* # Route all other calls to the frontend
+        destination: /index.html
