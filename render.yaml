@@ -1,18 +1,16 @@
 databases:
   - name: ciso-db
     plan: free
-    postgres:
-      version: 14
-    ipAllowList: []  # Only allow internal connections
+    postgresMajorVersion: "14"
+    ipAllowList: []
 
 services:
-  # Backend Service
   - type: web
     name: backend
     runtime: docker
     repo: https://github.com/compliance-rehab/ciso-assistant-community.git
-    branch: main           # Change if you use a different branch for your backend
-    rootDir: backend       # Adjust if your Dockerfile is not in /backend
+    branch: main
+    rootDir: backend
     plan: free
     region: oregon
     healthCheckPath: /api/build
@@ -24,13 +22,12 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
 
-  # Huey worker (background tasks)
   - type: worker
     name: huey
     runtime: docker
     repo: https://github.com/compliance-rehab/ciso-assistant-community.git
-    branch: main          # Change if you use a different branch
-    rootDir: backend      # Adjust if necessary
+    branch: main
+    rootDir: backend
     plan: free
     region: oregon
     dockerCommand: "poetry run python manage.py run_huey -w 2"
@@ -40,17 +37,14 @@ services:
           name: ciso-db
           property: connectionString
 
-  # Frontend Service
   - type: web
     name: frontend
     runtime: docker
     repo: https://github.com/compliance-rehab/ciso-assistant-community.git
-    branch: main           # Change if using a different branch
-    rootDir: frontend      # Adjust if your Dockerfile is not in /frontend
+    branch: main
+    rootDir: frontend
     plan: free
     region: oregon
     envVars:
-      # If your frontend expects a backend API, expose the Render backend service URL here.
-      # Replace the value with your service's real Render URL after initial deployment:
       - key: PUBLIC_BACKEND_API_URL
         value: "https://backend-RENDERHASH.onrender.com/api"
